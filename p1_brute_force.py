@@ -1,61 +1,57 @@
-import os
-from typing import List
+#!/usr/bin/env python
+"""
+Project 1 TSP Brute Force Approach
+@author Andrew Nguyen Vo
+@copyright Copyright 2019, Andrew Nguyen Vo, All Rights Reserved
+"""
 
-from classes.city import City
-from classes.routeResults import RouteResults
+import os
 from utils import *
 from math import factorial
+from time import time
 
 
-def generate_route_results(cities: List[City]) -> RouteResults:
+def generate_route_results(cities: List[City]) -> None:
     """
-    Recursively generates all possible city routes and finds the least cost route
+    Recursively generates the minimum cost route given a list of cities
     """
-    route_results = RouteResults()
-    total_routes: int = factorial(len(cities))  # Used for calculating percent complete
-    routes_processed = 0  # Used for calculating percent complete
+    min_route = []
+    total_generated_routes: int = factorial(len(cities)) // len(cities)  # Used for calculating percent complete
+    routes_processed = 0
 
     def generate_route(rem_cities: List[City], curr_route: List[City]) -> None:
         """
-        Inner recursive function whose base case writes
-        completed route and route distance to file if remaining
-        cities parameter is empty. Else, each city in remaining
-        cities calls the recursive function with itself moved
-        from remaining cities list to current route list
+        Recursion function that builds the routes and identifies the minimum cost route from these
         """
+        nonlocal min_route
+
         if len(rem_cities) == 0:
-            route_results.add_route(curr_route)
             curr_route_distance: float = calc_total_distance(curr_route)
-            min_route_distance: float = calc_total_distance(route_results.min_route)
+            min_route_distance: float = calc_total_distance(min_route)
 
             # Compares and replaces minimum route if lower cost route is found
-            if len(route_results.min_route) == 0 or curr_route_distance < min_route_distance:
-                route_results.min_route: List[City] = curr_route
-            write_route_to_file(curr_route)
+            if len(min_route) == 0 or curr_route_distance < min_route_distance:
+                min_route = curr_route
+
             nonlocal routes_processed
             routes_processed += 1
-            print_progress(routes_processed, total_routes, 5)
+            print_progress(routes_processed, total_generated_routes, 5)
         else:
             for city in rem_cities:
-                tmp_curr_route: List[City] = curr_route.copy()
+                tmp_rem_cities = rem_cities.copy()
+                tmp_curr_route = curr_route.copy()
                 tmp_curr_route.append(city)
-                new_rem_cities: List[City] = rem_cities.copy()
-                new_rem_cities.remove(city)
-                generate_route(new_rem_cities, tmp_curr_route)
+                tmp_rem_cities.remove(city)
+                generate_route(tmp_rem_cities, tmp_curr_route)
 
-    # Prints header for the results file
-    write_file.write(' ' * 100 + '\n')
-    write_file.write('All route results\n-------------------\n')
+    # Set first city as starting point in recursive function always to eliminate repeat cycles
+    starting_city: City = cities[0]
+    cities.pop(0)
+    generate_route(cities, [starting_city])
 
-    # Initial call to the recursive function
-    generate_route(cities, [])
-
-    # Writes the minimum route to the top of the results file
-    write_file.seek(0, 0)
+    # Writes the minimum route with its calculated distance
     write_file.write('Min route\n' + '-' * 10 + '\n')
-    write_route_to_file(route_results.min_route)
-
-    return route_results
+    write_route_to_file(min_route)
 
 
 def get_city_list(file_path: str) -> List[City]:
@@ -83,16 +79,16 @@ def write_route_to_file(route: List[City]) -> None:
     write_file.write('] = ' + f'{calc_total_distance(route)}\n')
 
 
-def print_success() -> None:
+def print_success(results_file_name: str) -> None:
     """Print message to console on successful execution"""
     print('\r' + ' ' * 100)
-    print('=' * 50)
-    print('Results generated! Have a nice day!')
-    print('=' * 50)
+    print('=' * 55)
+    print(f'Results generated in {results_file_name}. Have a nice day!')
+    print('=' * 55)
 
 
 # Global reference to file where route results are saved
-write_file = open('results.txt', 'w')
+write_file = None
 
 
 def main() -> None:
@@ -106,12 +102,28 @@ def main() -> None:
     try:
         # Only open files of type TSP
         file_path: str = get_file_path([('TSP', '*.tsp')])
+
+        # Start time after TSP file is selected
+        start_time: int = time()
+
         if file_path is not None:
             city_list: List[City] = get_city_list(file_path)
             if city_list is not None and len(city_list) > 0:
+                write_file_name = f'results{len(city_list)}.txt'
+                global write_file
+                write_file = open(write_file_name, 'w')
                 generate_route_results(city_list)
-                print_success()
-                os.startfile('results.txt')
+                write_file.close()
+
+                # Write footer to results file
+                write_file = open(write_file_name, 'a')
+                write_file.write('\n' + '=' * 33)
+                write_file.write(f'\nResults generated in {calc_elapsed_ts(start_time)}')
+                write_file.write('\n' + '=' * 33)
+                print_success(write_file_name)
+
+                # Open results file upon completion
+                os.startfile(write_file_name)
             else:
                 print('\rRegrettably, no cities could be parsed from file')
         else:
